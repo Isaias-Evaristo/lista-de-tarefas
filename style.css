@@ -65,3 +65,12 @@ footer {
     color: #333;
     padding: 20px;
 }
+
+li {
+    cursor: pointer;
+}
+
+.feita {
+    text-decoration: line-through;
+    color: #888;
+}

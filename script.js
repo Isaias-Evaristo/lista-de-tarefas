@@ -10,6 +10,11 @@ botao.addEventListener("click", function () {
     } else {
         let item = document.createElement("li");
         item.textContent = texto;
+
+        item.addEventListener("click", function () {
+            item.classList.toggle("feita");
+        });
+
         lista.appendChild(item);
         campo.value = "";
     }
