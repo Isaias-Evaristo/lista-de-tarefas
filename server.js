@@ -26,6 +26,8 @@ const tipos = {
 };
 
 const servidor = http.createServer(function (requisicao, resposta) {
+    const partes = requisicao.url.split("/");
+
     if (requisicao.url === "/api/tarefas" && requisicao.method === "POST") {
         let corpo = "";
 
@@ -51,6 +53,17 @@ const servidor = http.createServer(function (requisicao, resposta) {
                 resposta.end("Dados inválidos");
             }
         });
+    } else if (requisicao.method === "PATCH" && partes[1] === "api" && partes[2] === "tarefas") {
+        const id = Number(partes[3]);
+
+        if (!Number.isInteger(id)) {
+            resposta.statusCode = 400;
+            resposta.end("Id inválido");
+            return;
+        }
+
+        banco.prepare("UPDATE tarefas SET feito = 1 - feito WHERE id = ?").run(id);
+        resposta.end("Tarefa atualizada");
     } else if (requisicao.url === "/api/tarefas") {
         const lista = banco.prepare("SELECT * FROM tarefas").all();
         resposta.setHeader("Content-Type", "application/json; charset=utf-8");

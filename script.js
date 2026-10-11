@@ -10,7 +10,8 @@ function mostrarTarefa(tarefa) {
         item.classList.add("feita");
     }
 
-    item.addEventListener("click", function () {
+    item.addEventListener("click", async function () {
+        await fetch("/api/tarefas/" + tarefa.id, { method: "PATCH" });
         item.classList.toggle("feita");
     });
 
