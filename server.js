@@ -26,7 +26,32 @@ const tipos = {
 };
 
 const servidor = http.createServer(function (requisicao, resposta) {
-    if (requisicao.url === "/api/tarefas") {
+    if (requisicao.url === "/api/tarefas" && requisicao.method === "POST") {
+        let corpo = "";
+
+        requisicao.on("data", function (pedaco) {
+            corpo += pedaco;
+        });
+
+        requisicao.on("end", function () {
+            try {
+                const dados = JSON.parse(corpo);
+
+                if (!dados.titulo || dados.titulo.trim() === "") {
+                    resposta.statusCode = 400;
+                    resposta.end("O título é obrigatório");
+                    return;
+                }
+
+                banco.prepare("INSERT INTO tarefas (titulo) VALUES (?)").run(dados.titulo.trim());
+                resposta.statusCode = 201;
+                resposta.end("Tarefa criada");
+            } catch (erro) {
+                resposta.statusCode = 400;
+                resposta.end("Dados inválidos");
+            }
+        });
+    } else if (requisicao.url === "/api/tarefas") {
         const lista = banco.prepare("SELECT * FROM tarefas").all();
         resposta.setHeader("Content-Type", "application/json; charset=utf-8");
         resposta.end(JSON.stringify(lista));
