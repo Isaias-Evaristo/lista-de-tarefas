@@ -13,6 +13,13 @@ let aviso = document.getElementById("aviso");
 let saudacao = document.getElementById("saudacao");
 let sair = document.getElementById("sair");
 
+function cabecalhos() {
+    return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + localStorage.getItem("token")
+    };
+}
+
 function mostrarTarefa(tarefa) {
     let item = document.createElement("li");
     item.textContent = tarefa.titulo;
@@ -22,7 +29,10 @@ function mostrarTarefa(tarefa) {
     }
 
     item.addEventListener("click", async function () {
-        await fetch("/api/tarefas/" + tarefa.id, { method: "PATCH" });
+        await fetch("/api/tarefas/" + tarefa.id, {
+            method: "PATCH",
+            headers: cabecalhos()
+        });
         item.classList.toggle("feita");
     });
 
@@ -30,7 +40,16 @@ function mostrarTarefa(tarefa) {
 }
 
 async function carregarTarefas() {
-    let resposta = await fetch("/api/tarefas");
+    let resposta = await fetch("/api/tarefas", { headers: cabecalhos() });
+
+    if (resposta.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("nome");
+        mostrarTelaLogin();
+        aviso.textContent = "Sua sessão expirou. Entre novamente.";
+        return;
+    }
+
     let tarefas = await resposta.json();
     lista.innerHTML = "";
     tarefas.forEach(mostrarTarefa);
@@ -49,6 +68,7 @@ function mostrarTelaLogin() {
     areaTarefas.classList.add("escondido");
     sair.classList.add("escondido");
     saudacao.textContent = "";
+    lista.innerHTML = "";
 }
 
 cadastrar.addEventListener("click", async function () {
@@ -93,7 +113,7 @@ botao.addEventListener("click", async function () {
     } else {
         await fetch("/api/tarefas", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: cabecalhos(),
             body: JSON.stringify({ titulo: texto })
         });
         campo.value = "";

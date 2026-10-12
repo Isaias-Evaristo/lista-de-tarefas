@@ -2,17 +2,9 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
-const { criarHash, conferirSenha, criarSessao } = require("./auth.js");
+const { criarHash, conferirSenha, criarSessao, usuarioDaSessao } = require("./auth.js");
 
 const banco = new DatabaseSync("tarefas.db");
-
-banco.exec(`
-    CREATE TABLE IF NOT EXISTS tarefas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        titulo TEXT NOT NULL,
-        feito INTEGER DEFAULT 0
-    )
-`);
 
 banco.exec(`
     CREATE TABLE IF NOT EXISTS usuarios (
@@ -20,6 +12,16 @@ banco.exec(`
         nome TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         senha TEXT NOT NULL
+    )
+`);
+
+banco.exec(`
+    CREATE TABLE IF NOT EXISTS tarefas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT NOT NULL,
+        feito INTEGER DEFAULT 0,
+        usuario_id INTEGER NOT NULL,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
     )
 `);
 
@@ -65,6 +67,12 @@ function validarCadastro(dados) {
     return "";
 }
 
+function usuarioLogado(requisicao) {
+    const cabecalho = requisicao.headers["authorization"] || "";
+    const token = cabecalho.replace("Bearer ", "");
+    return usuarioDaSessao(token);
+}
+
 const servidor = http.createServer(function (requisicao, resposta) {
     const partes = requisicao.url.split("/");
 
@@ -105,33 +113,48 @@ const servidor = http.createServer(function (requisicao, resposta) {
             resposta.setHeader("Content-Type", "application/json; charset=utf-8");
             resposta.end(JSON.stringify({ token: token, nome: usuario.nome }));
         });
-    } else if (requisicao.url === "/api/tarefas" && requisicao.method === "POST") {
-        lerJson(requisicao, resposta, function (dados) {
-            if (!dados.titulo || dados.titulo.trim() === "") {
-                resposta.statusCode = 400;
-                resposta.end("O título é obrigatório");
-                return;
-            }
+    } else if (requisicao.url.startsWith("/api/tarefas")) {
+        const usuarioId = usuarioLogado(requisicao);
 
-            banco.prepare("INSERT INTO tarefas (titulo) VALUES (?)").run(dados.titulo.trim());
-            resposta.statusCode = 201;
-            resposta.end("Tarefa criada");
-        });
-    } else if (requisicao.method === "PATCH" && partes[1] === "api" && partes[2] === "tarefas") {
-        const id = Number(partes[3]);
-
-        if (!Number.isInteger(id)) {
-            resposta.statusCode = 400;
-            resposta.end("Id inválido");
+        if (!usuarioId) {
+            resposta.statusCode = 401;
+            resposta.end("Faça login para continuar");
             return;
         }
 
-        banco.prepare("UPDATE tarefas SET feito = 1 - feito WHERE id = ?").run(id);
-        resposta.end("Tarefa atualizada");
-    } else if (requisicao.url === "/api/tarefas") {
-        const lista = banco.prepare("SELECT * FROM tarefas").all();
-        resposta.setHeader("Content-Type", "application/json; charset=utf-8");
-        resposta.end(JSON.stringify(lista));
+        if (requisicao.method === "POST" && requisicao.url === "/api/tarefas") {
+            lerJson(requisicao, resposta, function (dados) {
+                if (!dados.titulo || dados.titulo.trim() === "") {
+                    resposta.statusCode = 400;
+                    resposta.end("O título é obrigatório");
+                    return;
+                }
+
+                banco.prepare("INSERT INTO tarefas (titulo, usuario_id) VALUES (?, ?)")
+                    .run(dados.titulo.trim(), usuarioId);
+                resposta.statusCode = 201;
+                resposta.end("Tarefa criada");
+            });
+        } else if (requisicao.method === "PATCH") {
+            const id = Number(partes[3]);
+
+            if (!Number.isInteger(id)) {
+                resposta.statusCode = 400;
+                resposta.end("Id inválido");
+                return;
+            }
+
+            banco.prepare("UPDATE tarefas SET feito = 1 - feito WHERE id = ? AND usuario_id = ?")
+                .run(id, usuarioId);
+            resposta.end("Tarefa atualizada");
+        } else if (requisicao.method === "GET" && requisicao.url === "/api/tarefas") {
+            const lista = banco.prepare("SELECT * FROM tarefas WHERE usuario_id = ?").all(usuarioId);
+            resposta.setHeader("Content-Type", "application/json; charset=utf-8");
+            resposta.end(JSON.stringify(lista));
+        } else {
+            resposta.statusCode = 405;
+            resposta.end("Método não permitido");
+        }
     } else if (arquivos[requisicao.url]) {
         const nome = arquivos[requisicao.url];
         resposta.setHeader("Content-Type", tipos[path.extname(nome)]);
