@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
+const { criarHash, conferirSenha, criarSessao } = require("./auth.js");
 
 const banco = new DatabaseSync("tarefas.db");
 
@@ -10,6 +11,15 @@ banco.exec(`
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT NOT NULL,
         feito INTEGER DEFAULT 0
+    )
+`);
+
+banco.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        senha TEXT NOT NULL
     )
 `);
 
@@ -25,33 +35,87 @@ const tipos = {
     ".js": "text/javascript; charset=utf-8"
 };
 
+function lerJson(requisicao, resposta, aoReceber) {
+    let corpo = "";
+
+    requisicao.on("data", function (pedaco) {
+        corpo += pedaco;
+    });
+
+    requisicao.on("end", function () {
+        try {
+            aoReceber(JSON.parse(corpo));
+        } catch (erro) {
+            resposta.statusCode = 400;
+            resposta.end("Dados inválidos");
+        }
+    });
+}
+
+function validarCadastro(dados) {
+    if (!dados.nome || dados.nome.trim() === "") {
+        return "O nome é obrigatório";
+    }
+    if (!dados.email || !dados.email.includes("@")) {
+        return "O e-mail precisa ter @";
+    }
+    if (!dados.senha || dados.senha.length < 8) {
+        return "A senha precisa ter pelo menos 8 caracteres";
+    }
+    return "";
+}
+
 const servidor = http.createServer(function (requisicao, resposta) {
     const partes = requisicao.url.split("/");
 
-    if (requisicao.url === "/api/tarefas" && requisicao.method === "POST") {
-        let corpo = "";
+    if (requisicao.url === "/api/cadastro" && requisicao.method === "POST") {
+        lerJson(requisicao, resposta, function (dados) {
+            const erro = validarCadastro(dados);
 
-        requisicao.on("data", function (pedaco) {
-            corpo += pedaco;
-        });
-
-        requisicao.on("end", function () {
-            try {
-                const dados = JSON.parse(corpo);
-
-                if (!dados.titulo || dados.titulo.trim() === "") {
-                    resposta.statusCode = 400;
-                    resposta.end("O título é obrigatório");
-                    return;
-                }
-
-                banco.prepare("INSERT INTO tarefas (titulo) VALUES (?)").run(dados.titulo.trim());
-                resposta.statusCode = 201;
-                resposta.end("Tarefa criada");
-            } catch (erro) {
+            if (erro !== "") {
                 resposta.statusCode = 400;
-                resposta.end("Dados inválidos");
+                resposta.end(erro);
+                return;
             }
+
+            const existe = banco.prepare("SELECT id FROM usuarios WHERE email = ?").get(dados.email.trim());
+
+            if (existe) {
+                resposta.statusCode = 409;
+                resposta.end("E-mail já cadastrado");
+                return;
+            }
+
+            banco.prepare("INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)")
+                .run(dados.nome.trim(), dados.email.trim(), criarHash(dados.senha));
+            resposta.statusCode = 201;
+            resposta.end("Usuário criado");
+        });
+    } else if (requisicao.url === "/api/login" && requisicao.method === "POST") {
+        lerJson(requisicao, resposta, function (dados) {
+            const usuario = banco.prepare("SELECT * FROM usuarios WHERE email = ?").get(dados.email);
+
+            if (!usuario || !conferirSenha(dados.senha, usuario.senha)) {
+                resposta.statusCode = 401;
+                resposta.end("E-mail ou senha incorretos");
+                return;
+            }
+
+            const token = criarSessao(usuario.id);
+            resposta.setHeader("Content-Type", "application/json; charset=utf-8");
+            resposta.end(JSON.stringify({ token: token, nome: usuario.nome }));
+        });
+    } else if (requisicao.url === "/api/tarefas" && requisicao.method === "POST") {
+        lerJson(requisicao, resposta, function (dados) {
+            if (!dados.titulo || dados.titulo.trim() === "") {
+                resposta.statusCode = 400;
+                resposta.end("O título é obrigatório");
+                return;
+            }
+
+            banco.prepare("INSERT INTO tarefas (titulo) VALUES (?)").run(dados.titulo.trim());
+            resposta.statusCode = 201;
+            resposta.end("Tarefa criada");
         });
     } else if (requisicao.method === "PATCH" && partes[1] === "api" && partes[2] === "tarefas") {
         const id = Number(partes[3]);
