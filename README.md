@@ -1,6 +1,6 @@
 # Lista de Tarefas
 
-Aplicação web de lista de tarefas, feita para juntar tudo o que aprendi na disciplina de Desenvolvimento de Aplicações para Internet.
+Aplicação web de lista de tarefas, feita para juntar tudo o que aprendi em Desenvolvimento de Aplicações para Internet.
 
 ## O que ela faz
 
