@@ -9,19 +9,33 @@
 <body>
     <header>
         <h1>Lista de Tarefas</h1>
+        <p id="saudacao"></p>
+        <button id="sair" class="escondido">Sair</button>
     </header>
 
     <main>
-        <section>
-            <h2>Nova tarefa</h2>
-            <input type="text" id="campo" placeholder="Digite uma tarefa">
-            <button id="botao">Adicionar</button>
+        <section id="area-login">
+            <h2>Entrar ou cadastrar</h2>
+            <input type="text" id="nome" placeholder="Nome (só para cadastrar)">
+            <input type="email" id="email" placeholder="E-mail">
+            <input type="password" id="senha" placeholder="Senha (mínimo 8 caracteres)">
+            <button id="entrar">Entrar</button>
+            <button id="cadastrar">Cadastrar</button>
+            <p id="aviso"></p>
         </section>
 
-        <section>
-            <h2>Minhas tarefas</h2>
-            <ul id="lista"></ul>
-        </section>
+        <div id="area-tarefas" class="escondido">
+            <section>
+                <h2>Nova tarefa</h2>
+                <input type="text" id="campo" placeholder="Digite uma tarefa">
+                <button id="botao">Adicionar</button>
+            </section>
+
+            <section>
+                <h2>Minhas tarefas</h2>
+                <ul id="lista"></ul>
+            </section>
+        </div>
     </main>
 
     <footer>

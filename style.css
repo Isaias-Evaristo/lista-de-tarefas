@@ -74,3 +74,24 @@ li {
     text-decoration: line-through;
     color: #888;
 }
+
+.escondido {
+    display: none;
+}
+
+#area-login input {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+#area-login button {
+    margin-right: 10px;
+}
+
+#aviso {
+    color: darkred;
+}
+
+#saudacao {
+    margin: 10px 0;
+} 
