@@ -166,6 +166,8 @@ const servidor = http.createServer(function (requisicao, resposta) {
     }
 });
 
-servidor.listen(3000, function () {
-    console.log("Servidor rodando em http://localhost:3000");
+const porta = process.env.PORT || 3000;
+
+servidor.listen(porta, function () {
+    console.log("Servidor rodando na porta " + porta);
 });
